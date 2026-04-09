@@ -1,5 +1,5 @@
 {
-  "name": "voice-claude",
+  "name": "voice-coda",
   "private": true,
   "scripts": {
     "build": "turbo run build",

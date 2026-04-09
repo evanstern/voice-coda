@@ -1,8 +1,8 @@
-# voice-claude
+# voice-coda
 
 A hands-free voice interface for coding agents. Talk through Bluetooth earbuds on your phone while your hands are busy, and have the agent work on code, manage repos, and talk back.
 
-> Planned successor repo: **voice-coda** — the broader wake-word-first version of this project. See [`docs/successor/voice-coda-plan.md`](docs/successor/voice-coda-plan.md), [`docs/successor/voice-coda-execution-plan.md`](docs/successor/voice-coda-execution-plan.md), and [`docs/successor/voice-coda-migration-checklist.md`](docs/successor/voice-coda-migration-checklist.md).
+> `voice-coda` is the successor to `voice-claude`: same core voice loop, but re-positioned around wake-word-first interaction and provider-agnostic agent backends.
 
 ```
 Earbuds Mic → Wake-word detection (optional) → Speech-to-Text → AI agent/tools → Text-to-Speech → Earbuds Speaker
@@ -12,7 +12,13 @@ Earbuds Mic → Wake-word detection (optional) → Speech-to-Text → AI agent/t
 
 - **Provider-agnostic agent backend** — supports Anthropic directly, Claude Code CLI, or OpenCode headless.
 - **Wake-word path in progress** — includes an openWakeWord service, browser integration, and training assets for the custom `"Coda"` wake word.
-- **Successor planning** — `voice-coda` is the intended next repo/product name once the wake-word-first flow is ready to split out.
+- **Transition status** — this repo is in the first cutover phase, so some internal package, CLI, config, and service names still use `voice-claude` and will be renamed in follow-up phases.
+
+See the rollout docs:
+
+- [`docs/successor/voice-coda-plan.md`](docs/successor/voice-coda-plan.md)
+- [`docs/successor/voice-coda-execution-plan.md`](docs/successor/voice-coda-execution-plan.md)
+- [`docs/successor/voice-coda-migration-checklist.md`](docs/successor/voice-coda-migration-checklist.md)
 
 ## Prerequisites
 
@@ -24,8 +30,8 @@ Earbuds Mic → Wake-word detection (optional) → Speech-to-Text → AI agent/t
 ## Quick Start (Bare Metal)
 
 ```bash
-git clone https://github.com/evanstern/voice-claude.git
-cd voice-claude
+git clone https://github.com/evanstern/voice-coda.git
+cd voice-coda
 
 # Prepare the installed runtime config outside the repo
 mkdir -p ~/.config/voice-claude
