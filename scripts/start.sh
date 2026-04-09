@@ -20,7 +20,8 @@ fail() {
 }
 
 load_env() {
-  local env_file=${VOICE_CLAUDE_CONFIG:-${PROJECT_ROOT}/.env}
+  # Support legacy VOICE_CLAUDE_CONFIG for one transition release
+  local env_file=${VOICE_CODA_CONFIG:-${VOICE_CLAUDE_CONFIG:-${PROJECT_ROOT}/.env}}
 
   if [[ -f "${env_file}" ]]; then
     set -a

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# voice-claude CLI — lifecycle management for the voice-claude service.
-# Installed to /usr/local/bin/voice-claude by install.sh.
+# voice-coda CLI — lifecycle management for the voice-coda service.
+# Installed to /usr/local/bin/voice-coda by install.sh.
 
-SERVICE_NAME=voice-claude
+SERVICE_NAME=voice-coda
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 PROJECT_ROOT="__PROJECT_ROOT__"
 
 CONFIG_FILE="__CONFIG_FILE__"
 if [[ "${CONFIG_FILE}" == "__CONFIG_FILE__" ]]; then
-  CONFIG_FILE="${VOICE_CLAUDE_CONFIG:-${PROJECT_ROOT}/.env}"
+  # Support legacy VOICE_CLAUDE_CONFIG for one transition release
+  CONFIG_FILE="${VOICE_CODA_CONFIG:-${VOICE_CLAUDE_CONFIG:-${PROJECT_ROOT}/.env}}"
 fi
 
 ENV_FILE="${CONFIG_FILE}"
@@ -25,8 +26,8 @@ else
   exit 1
 fi
 
-log() { printf '[voice-claude] %s\n' "$*"; }
-fail() { printf '[voice-claude] ERROR: %s\n' "$*" >&2; exit 1; }
+log() { printf '[voice-coda] %s\n' "$*"; }
+fail() { printf '[voice-coda] ERROR: %s\n' "$*" >&2; exit 1; }
 
 require_service() {
   if [[ ! -f "${SERVICE_FILE}" ]]; then
@@ -117,9 +118,16 @@ cmd_uninstall() {
     log "Removed ${SERVICE_FILE}"
   fi
 
+  # Remove new CLI location
+  if [[ -f /usr/local/bin/voice-coda ]]; then
+    "${SUDO[@]}" rm -f /usr/local/bin/voice-coda
+    log "Removed /usr/local/bin/voice-coda"
+  fi
+
+  # Clean up legacy CLI if still present
   if [[ -f /usr/local/bin/voice-claude ]]; then
     "${SUDO[@]}" rm -f /usr/local/bin/voice-claude
-    log "Removed /usr/local/bin/voice-claude"
+    log "Removed legacy /usr/local/bin/voice-claude"
   fi
 
   log "Uninstalled. Project files in ${PROJECT_ROOT} and config in ${ENV_FILE} were not removed."
@@ -127,12 +135,12 @@ cmd_uninstall() {
 
 usage() {
   cat <<EOF
-Usage: voice-claude <command> [options]
+Usage: voice-coda <command> [options]
 
 Commands:
-  start       Start the voice-claude service
-  stop        Stop the voice-claude service
-  restart     Restart the voice-claude service
+  start       Start the voice-coda service
+  stop        Stop the voice-coda service
+  restart     Restart the voice-coda service
   status      Show service status
   logs        Show service logs (use -f to follow, -n <lines> for count)
   update      Pull latest code, rebuild, and restart

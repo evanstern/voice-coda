@@ -20,8 +20,9 @@ fi
 INSTALL_GROUP=$(id -gn "${INSTALL_USER}")
 INSTALL_HOME=$(getent passwd "${INSTALL_USER}" | cut -d: -f6 || true)
 CONFIG_HOME=${INSTALL_HOME}/.config
-CONFIG_DIR="${CONFIG_HOME}/voice-claude"
+CONFIG_DIR="${CONFIG_HOME}/voice-coda"
 CONFIG_FILE="${CONFIG_DIR}/config.env"
+LEGACY_CONFIG_DIR="${CONFIG_HOME}/voice-claude"
 
 WITH_PIPER=false
 if [[ "${INSTALL_PIPER:-false}" == "true" ]]; then
@@ -153,6 +154,9 @@ write_config_file() {
 ensure_config_file() {
   if [[ -f "${CONFIG_FILE}" ]]; then
     :
+  elif [[ -f "${LEGACY_CONFIG_DIR}/config.env" ]]; then
+    log "Migrating config from ${LEGACY_CONFIG_DIR} to ${CONFIG_DIR}"
+    write_config_file "${LEGACY_CONFIG_DIR}/config.env"
   elif [[ -f "${PROJECT_ROOT}/.env" ]]; then
     log "Migrating existing repo config to ${CONFIG_FILE}"
     write_config_file "${PROJECT_ROOT}/.env"
@@ -244,9 +248,9 @@ setup_cloudflare_tunnel() {
   printf '[install] Enter the hostname to expose (e.g. voice.example.com): '
   read -r CF_HOSTNAME
 
-  log "Creating tunnel 'voice-claude'"
+  log "Creating tunnel 'voice-coda'"
   local tunnel_output
-  tunnel_output=$("${SUDO[@]}" cloudflared tunnel create voice-claude 2>&1)
+  tunnel_output=$("${SUDO[@]}" cloudflared tunnel create voice-coda 2>&1)
   printf '%s\n' "${tunnel_output}"
   local tunnel_id
   tunnel_id=$(printf '%s' "${tunnel_output}" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
@@ -256,7 +260,7 @@ setup_cloudflare_tunnel() {
   fi
 
   log "Routing DNS: ${CF_HOSTNAME} → tunnel ${tunnel_id}"
-  "${SUDO[@]}" cloudflared tunnel route dns voice-claude "${CF_HOSTNAME}"
+  "${SUDO[@]}" cloudflared tunnel route dns voice-coda "${CF_HOSTNAME}"
 
   "${SUDO[@]}" mkdir -p /etc/cloudflared
   "${SUDO[@]}" tee /etc/cloudflared/config.yml >/dev/null <<EOF
@@ -324,12 +328,12 @@ ensure_claude_code() {
   fi
 
   log "Claude Code CLI installed: $(claude --version 2>&1 | head -1)"
-  log 'NOTE: You must authenticate the CLI before voice-claude can use it.'
+  log 'NOTE: You must authenticate the CLI before voice-coda can use it.'
   log '      Run: claude login'
 }
 
 setup_systemd_service() {
-  local service_file="/etc/systemd/system/voice-claude.service"
+  local service_file="/etc/systemd/system/voice-coda.service"
   local run_user run_user_home
   run_user=${INSTALL_USER}
   run_user_home=${INSTALL_HOME}
@@ -338,14 +342,14 @@ setup_systemd_service() {
 
   "${SUDO[@]}" tee "${service_file}" >/dev/null <<EOF
 [Unit]
-Description=voice-claude — hands-free voice interface for Claude
+Description=voice-coda — hands-free voice interface for coding agents
 After=network.target
 
 [Service]
 Type=simple
 User=${run_user}
 Environment=PATH=${run_user_home}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Environment=VOICE_CLAUDE_CONFIG=${CONFIG_FILE}
+Environment=VOICE_CODA_CONFIG=${CONFIG_FILE}
 WorkingDirectory=${PROJECT_ROOT}
 ExecStart=${PROJECT_ROOT}/scripts/start.sh
 EnvironmentFile=${CONFIG_FILE}
@@ -359,13 +363,13 @@ WantedBy=multi-user.target
 EOF
 
   "${SUDO[@]}" systemctl daemon-reload
-  "${SUDO[@]}" systemctl enable voice-claude
-  "${SUDO[@]}" systemctl restart voice-claude
+  "${SUDO[@]}" systemctl enable voice-coda
+  "${SUDO[@]}" systemctl restart voice-coda
 }
 
 install_cli() {
-  local cli_src="${SCRIPT_DIR}/voice-claude"
-  local cli_dest="/usr/local/bin/voice-claude"
+  local cli_src="${SCRIPT_DIR}/voice-coda"
+  local cli_dest="/usr/local/bin/voice-coda"
 
   if [[ ! -f "${cli_src}" ]]; then
     fail "CLI script not found at ${cli_src}"
@@ -416,8 +420,8 @@ main() {
   install_cli
 
   log 'Install complete'
-  log 'The voice-claude service is now running.'
-  log 'Use "voice-claude status" to check, "voice-claude logs -f" to follow logs.'
+  log 'The voice-coda service is now running.'
+  log 'Use "voice-coda status" to check, "voice-coda logs -f" to follow logs.'
 }
 
 main "$@"
