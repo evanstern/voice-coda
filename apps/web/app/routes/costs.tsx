@@ -4,7 +4,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@voice-claude/ui/components/card'
+} from '@voice-coda/ui/components/card'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { getClientTRPC } from '../trpc/client.js'

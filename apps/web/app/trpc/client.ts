@@ -1,5 +1,5 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
-import type { AppRouter } from '@voice-claude/server/trpc/router'
+import type { AppRouter } from '@voice-coda/server/trpc/router'
 
 let _client: ReturnType<typeof createTRPCClient<AppRouter>> | null = null
 

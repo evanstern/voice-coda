@@ -1,4 +1,4 @@
-import '@voice-claude/ui/styles/globals.css'
+import '@voice-coda/ui/styles/globals.css'
 import {
   Links,
   Meta,

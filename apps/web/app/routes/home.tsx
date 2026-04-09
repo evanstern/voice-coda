@@ -1,4 +1,4 @@
-import type { ConversationSummary } from '@voice-claude/contracts'
+import type { ConversationSummary } from '@voice-coda/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createLogger } from '~/lib/logger'
 

@@ -4,7 +4,7 @@ import {
   type ClientWsMessage,
   type ControlMessage,
   clientWsMessage,
-} from '@voice-claude/contracts'
+} from '@voice-coda/contracts'
 import { type WebSocket, WebSocketServer } from 'ws'
 import { logger } from '../logger.js'
 import {

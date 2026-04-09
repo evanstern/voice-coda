@@ -1,5 +1,5 @@
 {
-  "name": "@voice-claude/server",
+  "name": "@voice-coda/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "@google-cloud/text-to-speech": "^6.0.0",
     "@hono/node-server": "^1.13.0",
     "@trpc/server": "^11.0.0",
-    "@voice-claude/contracts": "workspace:^",
+    "@voice-coda/contracts": "workspace:^",
     "hono": "^4.6.0",
     "hono-pino": "^0.10.3",
     "openai": "^4.96.0",

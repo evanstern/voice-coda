@@ -21,7 +21,7 @@ FROM deps AS build
 COPY . .
 
 # Build the web app and all its workspace dependencies
-RUN pnpm run build --filter=@voice-claude/web...
+RUN pnpm run build --filter=@voice-coda/web...
 
 # ---- Runner ----
 FROM node:22-slim AS runner

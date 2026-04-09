@@ -1,5 +1,5 @@
-import type { ConversationSummary } from '@voice-claude/contracts'
-import { Button } from '@voice-claude/ui/components/button'
+import type { ConversationSummary } from '@voice-coda/contracts'
+import { Button } from '@voice-coda/ui/components/button'
 import { Link } from 'react-router'
 
 interface ConversationListProps {

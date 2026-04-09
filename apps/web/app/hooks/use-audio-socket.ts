@@ -1,4 +1,4 @@
-import { type ServerWsMessage, serverWsMessage } from '@voice-claude/contracts'
+import { type ServerWsMessage, serverWsMessage } from '@voice-coda/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createLogger } from '~/lib/logger'
 

@@ -24,4 +24,4 @@ COPY . .
 
 EXPOSE 4000
 
-CMD ["pnpm", "--filter", "@voice-claude/server", "dev"]
+CMD ["pnpm", "--filter", "@voice-coda/server", "dev"]

@@ -1,5 +1,5 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
-import type { AppRouter } from '@voice-claude/server/trpc/router'
+import type { AppRouter } from '@voice-coda/server/trpc/router'
 
 export function createServerTRPC(cookie: string) {
   const serverUrl = process.env.SERVER_URL

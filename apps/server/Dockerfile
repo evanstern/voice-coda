@@ -21,7 +21,7 @@ FROM deps AS build
 COPY . .
 
 # Build the server and its workspace dependencies
-RUN pnpm run build --filter=@voice-claude/server...
+RUN pnpm run build --filter=@voice-coda/server...
 
 # ---- Runner ----
 FROM node:22-slim AS runner

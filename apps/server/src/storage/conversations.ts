@@ -8,7 +8,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ConversationSummary, Message } from '@voice-claude/contracts'
+import type { ConversationSummary, Message } from '@voice-coda/contracts'
 
 const DATA_DIR = join(process.cwd(), 'data', 'conversations')
 const INDEX_FILE = join(DATA_DIR, 'index.jsonl')

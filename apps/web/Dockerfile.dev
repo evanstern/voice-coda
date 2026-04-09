@@ -15,4 +15,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "@voice-claude/web", "dev"]
+CMD ["pnpm", "--filter", "@voice-coda/web", "dev"]

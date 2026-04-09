@@ -32,7 +32,7 @@ importers:
       '@trpc/server':
         specifier: ^11.0.0
         version: 11.16.0(typescript@5.9.3)
-      '@voice-claude/contracts':
+      '@voice-coda/contracts':
         specifier: workspace:^
         version: link:../../packages/contracts
       hono:
@@ -90,13 +90,13 @@ importers:
       '@types/react-syntax-highlighter':
         specifier: ^15.5.13
         version: 15.5.13
-      '@voice-claude/contracts':
+      '@voice-coda/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@voice-claude/server':
+      '@voice-coda/server':
         specifier: workspace:*
         version: link:../server
-      '@voice-claude/ui':
+      '@voice-coda/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       hono:
