@@ -1,31 +1,38 @@
 # voice-coda
 
-A hands-free voice interface for coding agents. Talk through Bluetooth earbuds on your phone while your hands are busy, and have the agent work on code, manage repos, and talk back.
+Wake with "Coda," code by voice. A hands-free voice interface for coding agents — talk through Bluetooth earbuds while your hands are busy, and have the agent work on code, manage repos, and talk back.
 
-> `voice-coda` is the successor to `voice-claude`: same core voice loop, but re-positioned around wake-word-first interaction and provider-agnostic agent backends.
+## How It Works
+
+voice-coda keeps a lightweight wake-word listener running in the background. When it hears **"Coda"**, it activates the full voice pipeline:
 
 ```
-Earbuds Mic → Wake-word detection (optional) → Speech-to-Text → AI agent/tools → Text-to-Speech → Earbuds Speaker
+Passive listen → Wake-word detected ("Coda") → Capture request → STT → AI agent/tools → TTS → Earbuds → Return to passive
 ```
 
-## Current Direction
+### Voice Interaction Flow
 
-- **Provider-agnostic agent backend** — supports Anthropic directly, Claude Code CLI, or OpenCode headless.
-- **Wake-word path in progress** — includes an openWakeWord service, browser integration, and training assets for the custom `"Coda"` wake word.
-- **Transition status** — this repo is in the first cutover phase, so some internal package, CLI, config, and service names still use `voice-claude` and will be renamed in follow-up phases.
+1. **Passive listen** — The browser streams mic audio to the openWakeWord service. Low CPU, no API calls, no transcription.
+2. **Wake detected** — The wake-word model hears "Coda" above the configured threshold. The app plays a confirmation tone.
+3. **Request capture** — Active recording begins. Speak your request naturally; Voice Activity Detection (VAD) detects when you stop.
+4. **Processing** — Audio goes to STT (Whisper), the transcript goes to the AI agent (Anthropic, Claude Code, or OpenCode), the agent runs tools and produces a response.
+5. **Response playback** — The response is synthesized via TTS and played back through your earbuds.
+6. **Return to passive** — After playback completes, the app returns to passive wake-word listening.
 
-See the rollout docs:
+### What Is Pluggable
 
-- [`docs/successor/voice-coda-plan.md`](docs/successor/voice-coda-plan.md)
-- [`docs/successor/voice-coda-execution-plan.md`](docs/successor/voice-coda-execution-plan.md)
-- [`docs/successor/voice-coda-migration-checklist.md`](docs/successor/voice-coda-migration-checklist.md)
+| Layer | Options |
+|---|---|
+| AI provider | Anthropic API, Claude Code CLI, OpenCode headless |
+| Speech-to-text | OpenAI Whisper API, local whisper-cpp |
+| Text-to-speech | OpenAI TTS, Google Cloud TTS, Piper (local, free) |
+| Wake-word model | Custom openWakeWord model (training assets included) |
 
-## Prerequisites
+### What Is Experimental
 
-- **Node.js 22+** (the install script will set this up for you on Debian/Ubuntu)
-- **pnpm 9.15+** (installed automatically via corepack)
-- **API keys**: Anthropic (required), OpenAI (required for default STT/TTS)
-- **Docker** (only if using Docker-based deployment)
+- **Mobile background audio** — keeping the mic/audio session alive when the phone screen is off or the browser is backgrounded is not yet reliable across all devices.
+- **False-positive tuning** — the default wake-word threshold works for quiet environments but may need adjustment for noisy settings.
+- **Passive mode UX** — the transition between passive listening and active recording is functional but still being refined.
 
 ## Quick Start (Bare Metal)
 
@@ -33,34 +40,73 @@ See the rollout docs:
 git clone https://github.com/evanstern/voice-coda.git
 cd voice-coda
 
-# Prepare the installed runtime config outside the repo
-mkdir -p ~/.config/voice-claude
-cp .env.example ~/.config/voice-claude/config.env
-vim ~/.config/voice-claude/config.env
+mkdir -p ~/.config/voice-coda
+cp .env.example ~/.config/voice-coda/config.env
+vim ~/.config/voice-coda/config.env
 
-# Install everything and start the service
 ./scripts/install.sh
 ```
 
 The install script sets up Node.js, builds the project, installs a systemd service, and starts it automatically. The web app will be at `http://localhost:3000` and the API server at `http://localhost:4000`.
 
+To enable wake-word detection, start the wake-word service alongside the main app (see [Wake Word Setup](#wake-word-setup) below).
+
 After installation, manage the service with:
 
 ```bash
-voice-claude status            # check if running
-voice-claude logs -f           # follow logs
-voice-claude restart           # restart after config changes
-voice-claude stop              # stop the service
-voice-claude start             # start it back up
-voice-claude update            # git pull, rebuild, restart
-voice-claude uninstall         # remove service and CLI
+voice-coda status            # check if running
+voice-coda logs -f           # follow logs
+voice-coda restart           # restart after config changes
+voice-coda stop              # stop the service
+voice-coda start             # start it back up
+voice-coda update            # git pull, rebuild, restart
+voice-coda uninstall         # remove service and CLI
 ```
+
+## Wake Word Setup
+
+The wake-word service uses [openWakeWord](https://github.com/dscripka/openWakeWord) to detect the "Coda" activation phrase. It runs as a separate process or Docker container alongside the main app.
+
+### Docker (recommended)
+
+The dev compose file includes a `wake-word` service:
+
+```bash
+docker compose up
+```
+
+### Bare metal
+
+```bash
+cd services/wake-word
+pip install -r requirements.txt
+python wake_word_service.py
+```
+
+The service listens on port `9000` (configurable via `WAKE_WORD_PORT`) and accepts WebSocket connections from the browser. The browser streams raw 16-bit PCM audio; the service responds with wake events when it detects "Coda".
+
+### Tuning
+
+| Variable | Default | What it controls |
+|---|---|---|
+| `WAKE_WORD_THRESHOLD` | `0.5` | Detection confidence (0–1). Higher = fewer false positives, more missed wakes. Start at 0.5 and increase if you get false triggers. |
+| `WAKE_WORD_VAD_THRESHOLD` | `0.5` | Voice Activity Detection filter (0–1). Filters non-speech audio before wake detection. |
+| `WAKE_WORD_PATIENCE` | `3` | Consecutive frames above threshold required before triggering. Higher = more resistant to brief noise spikes. |
+| `WAKE_WORD_DEBOUNCE` | `2.0` | Seconds to wait between detections. Prevents rapid re-triggering after a wake event. |
+| `WAKE_WORD_MODEL` | (built-in) | Path to a custom `.tflite` or `.onnx` model file. Leave empty to use the pre-trained models. Training assets for the custom "Coda" model are in `services/wake-word/training/`. |
+| `WAKE_WORD_MODELS_DIR` | `./models/wake-word` | Host directory containing model files. |
+
+**Tuning tips:**
+- Quiet home office: `WAKE_WORD_THRESHOLD=0.5`, `WAKE_WORD_PATIENCE=3` (defaults work well)
+- Noisy environment (kitchen, workshop): `WAKE_WORD_THRESHOLD=0.7`, `WAKE_WORD_PATIENCE=5`, `WAKE_WORD_VAD_THRESHOLD=0.7`
+- Getting false triggers: increase `WAKE_WORD_THRESHOLD` in 0.1 increments
+- Missing real wakes: decrease `WAKE_WORD_THRESHOLD` or `WAKE_WORD_PATIENCE`
 
 ## Configuration
 
-Installed bare-metal config lives at `~/.config/voice-claude/config.env`.
+Installed bare-metal config lives at `~/.config/voice-coda/config.env`.
 
-The install script creates that file from `.env.example` if it is missing, and migrates an existing repo-root `.env` on first install so current setups keep working.
+The install script creates that file from `.env.example` if it is missing, and migrates an existing `~/.config/voice-claude` config or repo-root `.env` on first install so current setups keep working.
 
 At minimum, you need to set:
 
@@ -86,25 +132,8 @@ OPENAI_API_KEY=sk-...          # Required for default Whisper STT and OpenAI TTS
 | `TTS_PROVIDER` | `openai` | Text-to-speech: `openai`, `google`, or `piper` |
 | `TTS_VOICE` | `nova` | OpenAI TTS voice name |
 | `WORK_DIR` | `./workspace` | Host directory mounted for AI tool execution |
-| `WAKE_WORD_PORT` | `9000` | openWakeWord WebSocket service port |
 | `BEHIND_PROXY` | `false` | Set `true` when behind a reverse proxy (Traefik, nginx) |
 | `CONVERSATIONS_DIR` | `./data/conversations` | Where conversation history is stored (production Docker) |
-
-### Wake Word Detection (openWakeWord)
-
-The repo now includes an optional wake-word service intended for the passive-listening flow:
-
-```bash
-WAKE_WORD_PORT=9000
-WAKE_WORD_MODEL=./models/wake-word/coda.tflite
-WAKE_WORD_THRESHOLD=0.5
-WAKE_WORD_VAD_THRESHOLD=0.5
-WAKE_WORD_PATIENCE=3
-WAKE_WORD_DEBOUNCE=2.0
-WAKE_WORD_MODELS_DIR=./models/wake-word
-```
-
-This service is designed to keep a lightweight listener running until it hears `"Coda"`, then hand off to the existing active recording / STT / agent / TTS pipeline.
 
 ### TTS Provider Options
 
@@ -136,9 +165,9 @@ WHISPER_BINARY=whisper-cpp  # path to whisper-cpp binary
 The install script handles everything on Debian/Ubuntu:
 
 ```bash
-mkdir -p ~/.config/voice-claude
-cp .env.example ~/.config/voice-claude/config.env
-vim ~/.config/voice-claude/config.env
+mkdir -p ~/.config/voice-coda
+cp .env.example ~/.config/voice-coda/config.env
+vim ~/.config/voice-coda/config.env
 
 ./scripts/install.sh
 ```
@@ -147,23 +176,23 @@ What it does:
 - Installs Node.js 22 from NodeSource (if not present or outdated)
 - Installs system packages (`git`, `curl`, `jq`, `python3`, `ripgrep`, etc.)
 - Enables pnpm via corepack
-- Creates `~/.config/voice-claude/config.env` from `.env.example` if needed
-- Migrates an existing repo-root `.env` into `~/.config/voice-claude/config.env` on first install
+- Creates `~/.config/voice-coda/config.env` from `.env.example` if needed
+- Migrates an existing `~/.config/voice-claude` config on first install
 - Runs `pnpm install` and `pnpm build`
-- Creates a systemd service (`voice-claude.service`) that auto-starts on boot
-- Installs the `voice-claude` CLI to `/usr/local/bin/`
+- Creates a systemd service (`voice-coda.service`) that auto-starts on boot
+- Installs the `voice-coda` CLI to `/usr/local/bin/`
 - Starts the service
 
-For installed bare-metal deployments, edit `~/.config/voice-claude/config.env` and then run `voice-claude restart`.
+For installed bare-metal deployments, edit `~/.config/voice-coda/config.env` and then run `voice-coda restart`.
 
 To update after a `git pull` (or let the CLI do it for you):
 ```bash
-voice-claude update
+voice-coda update
 ```
 
 ### 2. Docker (Development)
 
-Docker still uses a repo-local `.env` file because Compose resolves `env_file` from the working directory.
+Docker uses a repo-local `.env` file because Compose resolves `env_file` from the working directory.
 
 ```bash
 cp .env.example .env
@@ -171,11 +200,9 @@ cp .env.example .env
 docker compose up
 ```
 
-This mounts the source tree into the containers for hot-reloading.
+This mounts the source tree into the containers for hot-reloading. Includes the wake-word service.
 
 ### 3. Docker (Production -- Build Locally)
-
-Docker still uses a repo-local `.env` file because Compose resolves `env_file` from the working directory.
 
 ```bash
 cp .env.example .env
@@ -183,11 +210,9 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Builds multi-stage production images. Includes Traefik labels for reverse proxy routing -- set `VOICE_CLAUDE_HOST` to your domain.
+Builds multi-stage production images. Includes Traefik labels for reverse proxy routing -- set `VOICE_CODA_HOST` to your domain.
 
 ### 4. Docker (Production -- Pre-built Images)
-
-Docker still uses a repo-local `.env` file because Compose resolves `env_file` from the working directory.
 
 ```bash
 cp .env.example .env
@@ -195,7 +220,7 @@ cp .env.example .env
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-Pulls pre-built images from `ghcr.io/evanstern/voice-claude`. Use `IMAGE_TAG` to pin a version.
+Pulls pre-built images from `ghcr.io/evanstern/voice-coda`. Use `IMAGE_TAG` to pin a version.
 
 ## Piper Local TTS
 
@@ -213,7 +238,7 @@ docker compose -f docker-compose.prod.yml --profile piper up --build -d
 ```
 The `piper-init` sidecar container auto-downloads the model on first run.
 
-For bare metal installs, set this in `~/.config/voice-claude/config.env`.
+For bare metal installs, set this in `~/.config/voice-coda/config.env`.
 For Docker, set it in the repo-local `.env`.
 
 ```bash
@@ -222,13 +247,13 @@ TTS_PROVIDER=piper
 
 ## Reverse Proxy (Traefik)
 
-For bare metal installs, set `BEHIND_PROXY=true` in `~/.config/voice-claude/config.env`.
+For bare metal installs, set `BEHIND_PROXY=true` in `~/.config/voice-coda/config.env`.
 For Docker, set it in the repo-local `.env`.
 
 The production Docker Compose files include Traefik labels. To use them:
 
 1. Set `BEHIND_PROXY=true`
-2. Set `VOICE_CLAUDE_HOST` to your domain (default: `voice.local.infinity-node.win`)
+2. Set `VOICE_CODA_HOST` to your domain (default: `voice.local.infinity-node.win`)
 3. Ensure a `traefik-network` Docker network exists (or set `TRAEFIK_NETWORK` to your network name)
 
 Routes configured:
@@ -249,7 +274,7 @@ pnpm typecheck    # TypeScript type checking
 ## Project Structure
 
 ```
-voice-claude/
+voice-coda/
 ├── apps/
 │   ├── server/          # Hono + tRPC backend (API, WebSocket, tool execution)
 │   └── web/             # React Router 7 PWA (mic capture, audio playback)
@@ -262,8 +287,19 @@ voice-claude/
 ├── scripts/
 │   ├── install.sh       # Full setup script (Node, pnpm, deps, build, systemd)
 │   ├── start.sh         # Production process manager (ExecStart for systemd)
-│   └── voice-claude     # CLI source (installed to /usr/local/bin by install.sh)
+│   └── voice-coda       # CLI source (installed to /usr/local/bin by install.sh)
 ├── docker/              # Dockerfiles and support files
-├── models/              # Local model files (Piper voices)
+├── models/              # Local model files (Piper voices, wake-word models)
 └── docs/                # Additional documentation
 ```
+
+## Migrating from voice-claude
+
+`voice-coda` is the successor to `voice-claude`. If you have an existing `voice-claude` install:
+
+1. **Config** — The install script automatically migrates `~/.config/voice-claude/config.env` to the new `~/.config/voice-coda/` location on first install. The `VOICE_CLAUDE_CONFIG` environment variable is still recognized as a fallback.
+2. **CLI** — Replace `voice-claude` commands with `voice-coda` (same subcommands). The uninstall command cleans up the old CLI binary.
+3. **Docker** — Update image paths from `ghcr.io/evanstern/voice-claude/*` to `ghcr.io/evanstern/voice-coda/*`. Rename `VOICE_CLAUDE_HOST` to `VOICE_CODA_HOST` in your `.env`.
+4. **Imports** — If you have custom code depending on `@voice-claude/*` packages, update to `@voice-coda/*`.
+
+See [`docs/successor/voice-coda-migration-checklist.md`](docs/successor/voice-coda-migration-checklist.md) for the full checklist.

@@ -31,40 +31,40 @@ Use this alongside [`voice-coda-execution-plan.md`](./voice-coda-execution-plan.
 
 ### Repo/bootstrap
 
-- [ ] create the `voice-coda` repository
-- [ ] copy or transfer the current branch state into the new repo
-- [ ] update origin URLs, README title, and top-level package name
+- [x] create the `voice-coda` repository
+- [x] copy or transfer the current branch state into the new repo
+- [x] update origin URLs, README title, and top-level package name
 
 ### Branding + user-facing names
 
-- [ ] rename CLI/script references from `voice-claude` to `voice-coda`
-- [ ] rename config directory references to `~/.config/voice-coda`
-- [ ] rename service unit names and operational docs
-- [ ] replace remaining user-facing `Voice Claude` / Claude-only copy
+- [x] rename CLI/script references from `voice-claude` to `voice-coda`
+- [x] rename config directory references to `~/.config/voice-coda`
+- [x] rename service unit names and operational docs
+- [x] replace remaining user-facing `Voice Claude` / Claude-only copy
 
 ### Package scope migration
 
-- [ ] rename all `@voice-claude/*` packages
-- [ ] update imports across `apps/` and `packages/`
-- [ ] refresh lockfile after package rename
+- [x] rename all `@voice-claude/*` packages
+- [x] update imports across `apps/` and `packages/`
+- [x] refresh lockfile after package rename
 
 ### Infra/deployment
 
-- [ ] rename Docker image coordinates and Compose references
-- [ ] rename Traefik router/service labels
-- [ ] rename `VOICE_CLAUDE_*` env vars to `VOICE_CODA_*`
-- [ ] preserve compatibility aliases where practical for one transition release
+- [x] rename Docker image coordinates and Compose references
+- [x] rename Traefik router/service labels
+- [x] rename `VOICE_CLAUDE_*` env vars to `VOICE_CODA_*`
+- [x] preserve compatibility aliases where practical for one transition release
 
 ### Wake-word-first productization
 
-- [ ] promote wake-word setup into the main quick-start path
-- [ ] document openWakeWord tuning and model placement
-- [ ] define the passive-listen → wake → request → response state machine in user docs
+- [x] promote wake-word setup into the main quick-start path
+- [x] document openWakeWord tuning and model placement
+- [x] define the passive-listen → wake → request → response state machine in user docs
 
 ### Cleanup
 
-- [ ] keep backward-compat migration notes for existing installs
-- [ ] decide whether old historical docs stay under `voice-claude` wording
+- [x] keep backward-compat migration notes for existing installs
+- [x] decide whether old historical docs stay under `voice-claude` wording (kept as historical context)
 - [ ] cut a first `voice-coda` release once install/update paths are stable
 
 ## Recommended order

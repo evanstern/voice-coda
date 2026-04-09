@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-## Project: voice-claude
+## Project: voice-coda
 
-A hands-free voice interface for Claude Code. The goal: talk to Claude through Bluetooth earbuds (Pixel Buds) on an Android phone while your hands are busy — like working at a bakery — and have Claude working on code, managing repos, and talking back.
+A hands-free voice interface for coding agents. The goal: talk to your agent through Bluetooth earbuds (Pixel Buds) on an Android phone while your hands are busy — like working at a bakery — and have the agent working on code, managing repos, and talking back.
 
 ## Origin
 
@@ -29,8 +29,8 @@ Pixel Buds → Phone Mic → Speech-to-Text (Whisper / Google STT)
 - **Backend:** Hono + tRPC 11 (typesafe API)
 - **Frontend:** React 19 + React Router 7 + Vite 6
 - **Styling:** Tailwind CSS 4 + Radix UI
-- **UI Library:** `@voice-claude/ui` (shared components with CVA + tailwind-merge)
-- **Contracts:** `@voice-claude/contracts` (shared Zod schemas)
+- **UI Library:** `@voice-coda/ui` (shared components with CVA + tailwind-merge)
+- **Contracts:** `@voice-coda/contracts` (shared Zod schemas)
 - **API:** Anthropic Claude API with tool_use
 - **STT:** OpenAI Whisper (may switch to Google Cloud STT)
 - **TTS:** OpenAI TTS (may switch to ElevenLabs or Google Cloud TTS)
@@ -49,14 +49,20 @@ Pixel Buds → Phone Mic → Speech-to-Text (Whisper / Google STT)
 ## Project Structure
 
 ```
-voice-claude/
+voice-coda/
 ├── apps/
 │   ├── server/          — Hono + tRPC backend (API, WebSocket, tool execution)
 │   └── web/             — React Router 7 PWA (mic capture, audio playback)
+├── services/
+│   └── wake-word/       — openWakeWord service, model config, and training assets
 ├── packages/
 │   ├── contracts/       — Shared Zod schemas & types
 │   ├── shared/          — Shared utilities
 │   └── ui/              — Radix + Tailwind component library
+├── scripts/
+│   ├── install.sh       — Full setup script (Node, pnpm, deps, build, systemd)
+│   ├── start.sh         — Production process manager (ExecStart for systemd)
+│   └── voice-coda       — CLI source (installed to /usr/local/bin by install.sh)
 ├── docker-compose.yml
 ├── turbo.json
 ├── pnpm-workspace.yaml
