@@ -24,19 +24,19 @@ services:
     labels:
       - traefik.enable=true
       # WebSocket endpoint — must match before the catch-all web route
-      - traefik.http.routers.voice-claude-ws.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/ws`)
-      - traefik.http.routers.voice-claude-ws.entrypoints=web
-      - traefik.http.routers.voice-claude-ws.service=voice-claude-server
+      - traefik.http.routers.voice-coda-ws.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/ws`)
+      - traefik.http.routers.voice-coda-ws.entrypoints=web
+      - traefik.http.routers.voice-coda-ws.service=voice-coda-server
       # tRPC API — browser client hits /trpc directly when behind proxy
-      - traefik.http.routers.voice-claude-api.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/trpc`)
-      - traefik.http.routers.voice-claude-api.entrypoints=web
-      - traefik.http.routers.voice-claude-api.service=voice-claude-server
-      - traefik.http.routers.voice-claude-health.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && Path(`/api/health`)
-      - traefik.http.routers.voice-claude-health.entrypoints=web
-      - traefik.http.routers.voice-claude-health.service=voice-claude-server
-      - traefik.http.services.voice-claude-server.loadbalancer.server.port=4000
+      - traefik.http.routers.voice-coda-api.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/trpc`)
+      - traefik.http.routers.voice-coda-api.entrypoints=web
+      - traefik.http.routers.voice-coda-api.service=voice-coda-server
+      - traefik.http.routers.voice-coda-health.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && Path(`/api/health`)
+      - traefik.http.routers.voice-coda-health.entrypoints=web
+      - traefik.http.routers.voice-coda-health.service=voice-coda-server
+      - traefik.http.services.voice-coda-server.loadbalancer.server.port=4000
     networks:
-      - voice-claude
+      - voice-coda
       - traefik-network
 
   web:
@@ -56,13 +56,13 @@ services:
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.voice-claude-web.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`)
-      - traefik.http.routers.voice-claude-web.entrypoints=web
-      - traefik.http.routers.voice-claude-web.service=voice-claude-web
-      - traefik.http.routers.voice-claude-web.priority=1
-      - traefik.http.services.voice-claude-web.loadbalancer.server.port=3000
+      - traefik.http.routers.voice-coda-web.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`)
+      - traefik.http.routers.voice-coda-web.entrypoints=web
+      - traefik.http.routers.voice-coda-web.service=voice-coda-web
+      - traefik.http.routers.voice-coda-web.priority=1
+      - traefik.http.services.voice-coda-web.loadbalancer.server.port=3000
     networks:
-      - voice-claude
+      - voice-coda
       - traefik-network
 
   # Piper local TTS — only started with: docker compose --profile piper up
@@ -88,7 +88,7 @@ services:
       start_period: 15s
       retries: 3
     networks:
-      - voice-claude
+      - voice-coda
 
   # Auto-downloads en_US-lessac-medium model only. Custom models must be placed manually.
   piper-init:
@@ -118,7 +118,7 @@ services:
       PIPER_MODEL_NAME: ${PIPER_MODEL_NAME:-en_US-lessac-medium.onnx}
 
 networks:
-  voice-claude:
+  voice-coda:
     driver: bridge
   traefik-network:
     external: true

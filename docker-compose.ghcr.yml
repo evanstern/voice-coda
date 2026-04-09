@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/evanstern/voice-claude/server:${IMAGE_TAG:-latest}
+    image: ghcr.io/evanstern/voice-coda/server:${IMAGE_TAG:-latest}
     expose:
       - "4000"
     env_file:
@@ -17,22 +17,22 @@ services:
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.voice-claude-ws.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/ws`)
-      - traefik.http.routers.voice-claude-ws.entrypoints=web
-      - traefik.http.routers.voice-claude-ws.service=voice-claude-server
-      - traefik.http.routers.voice-claude-api.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/trpc`)
-      - traefik.http.routers.voice-claude-api.entrypoints=web
-      - traefik.http.routers.voice-claude-api.service=voice-claude-server
-      - traefik.http.routers.voice-claude-health.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`) && Path(`/api/health`)
-      - traefik.http.routers.voice-claude-health.entrypoints=web
-      - traefik.http.routers.voice-claude-health.service=voice-claude-server
-      - traefik.http.services.voice-claude-server.loadbalancer.server.port=4000
+      - traefik.http.routers.voice-coda-ws.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/ws`)
+      - traefik.http.routers.voice-coda-ws.entrypoints=web
+      - traefik.http.routers.voice-coda-ws.service=voice-coda-server
+      - traefik.http.routers.voice-coda-api.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && PathPrefix(`/trpc`)
+      - traefik.http.routers.voice-coda-api.entrypoints=web
+      - traefik.http.routers.voice-coda-api.service=voice-coda-server
+      - traefik.http.routers.voice-coda-health.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`) && Path(`/api/health`)
+      - traefik.http.routers.voice-coda-health.entrypoints=web
+      - traefik.http.routers.voice-coda-health.service=voice-coda-server
+      - traefik.http.services.voice-coda-server.loadbalancer.server.port=4000
     networks:
-      - voice-claude
+      - voice-coda
       - traefik-network
 
   web:
-    image: ghcr.io/evanstern/voice-claude/web:${IMAGE_TAG:-latest}
+    image: ghcr.io/evanstern/voice-coda/web:${IMAGE_TAG:-latest}
     expose:
       - "3000"
     env_file:
@@ -46,17 +46,17 @@ services:
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.voice-claude-web.rule=Host(`${VOICE_CLAUDE_HOST:-voice.local.infinity-node.win}`)
-      - traefik.http.routers.voice-claude-web.entrypoints=web
-      - traefik.http.routers.voice-claude-web.service=voice-claude-web
-      - traefik.http.routers.voice-claude-web.priority=1
-      - traefik.http.services.voice-claude-web.loadbalancer.server.port=3000
+      - traefik.http.routers.voice-coda-web.rule=Host(`${VOICE_CODA_HOST:-voice.local.infinity-node.win}`)
+      - traefik.http.routers.voice-coda-web.entrypoints=web
+      - traefik.http.routers.voice-coda-web.service=voice-coda-web
+      - traefik.http.routers.voice-coda-web.priority=1
+      - traefik.http.services.voice-coda-web.loadbalancer.server.port=3000
     networks:
-      - voice-claude
+      - voice-coda
       - traefik-network
 
   piper:
-    image: ghcr.io/evanstern/voice-claude/piper:${IMAGE_TAG:-latest}
+    image: ghcr.io/evanstern/voice-coda/piper:${IMAGE_TAG:-latest}
     profiles:
       - piper
     env_file:
@@ -76,7 +76,7 @@ services:
       start_period: 15s
       retries: 3
     networks:
-      - voice-claude
+      - voice-coda
 
   piper-init:
     image: alpine:3.20
@@ -105,7 +105,7 @@ services:
       PIPER_MODEL_NAME: ${PIPER_MODEL_NAME:-en_US-lessac-medium.onnx}
 
 networks:
-  voice-claude:
+  voice-coda:
     driver: bridge
   traefik-network:
     external: true
