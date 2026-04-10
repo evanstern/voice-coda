@@ -35,6 +35,7 @@ export const conversationSummarySchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   messageCount: z.number(),
+  aiSessionId: z.string().optional(),
 })
 
 export type ConversationSummary = z.infer<typeof conversationSummarySchema>
