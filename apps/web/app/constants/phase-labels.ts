@@ -3,14 +3,14 @@
  */
 export const PHASE_HINTS: Record<string, Record<string, string>> = {
   'push-to-talk': {
-    idle: 'Tap or hold space',
-    'passive-listening': 'Tap or hold space',
+    idle: 'Hold to talk',
+    'passive-listening': 'Hold to talk',
     recording: 'Release to send',
     transcribing: 'Tap to cancel',
     thinking: 'Tap to cancel',
     synthesizing: 'Tap to cancel',
     speaking: 'Tap to stop',
-    done: 'Tap or hold space',
+    done: 'Hold to talk',
   },
   auto: {
     idle: 'Say “Coda”',
