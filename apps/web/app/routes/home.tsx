@@ -253,10 +253,12 @@ export default function Home() {
           setConversation(entries)
           setPendingEntry(null)
           nextIdRef.current = entryId
-          audio.sendConversation(
-            activeConversationId,
-            isFirstMessageRef.current,
-          )
+          if (audio.connected) {
+            audio.sendConversation(
+              activeConversationId,
+              isFirstMessageRef.current,
+            )
+          }
         } catch (err) {
           log.error('failed to load conversation:', err)
           if (!cancelled) {
@@ -271,7 +273,9 @@ export default function Home() {
       setPendingEntry(null)
       nextIdRef.current = 1
       isFirstMessageRef.current = true
-      audio.sendConversation(null, true)
+      if (audio.connected) {
+        audio.sendConversation(null, true)
+      }
     }
 
     // Close drawer when navigating
@@ -280,7 +284,13 @@ export default function Home() {
     return () => {
       cancelled = true
     }
-  }, [activeConversationId, trpc, navigate, audio.sendConversation])
+  }, [
+    activeConversationId,
+    trpc,
+    navigate,
+    audio.connected,
+    audio.sendConversation,
+  ])
 
   // Delete conversation
   const deleteConversation = useCallback(
