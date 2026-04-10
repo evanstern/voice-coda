@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+
 import { PHASE_HINTS } from '../constants/phase-labels.js'
 
 type InputMode = 'push-to-talk' | 'auto' | 'wake-word'
@@ -82,11 +84,37 @@ export function MicButton({
 }: MicButtonProps) {
   const isRecording = phase === 'recording'
   const isPassiveListening = phase === 'passive-listening'
+  const isPushToTalk = mode === 'push-to-talk'
   const isAuto = mode === 'auto'
   const isWakeWord = mode === 'wake-word'
   const hints = PHASE_HINTS[mode] ?? PHASE_HINTS['push-to-talk'] ?? {}
+  const holdEndRef = useRef(0)
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isPushToTalk) return
+    if (busy || isRecording || !connected) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    onStart()
+  }
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isPushToTalk) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    if (isRecording) {
+      holdEndRef.current = Date.now()
+      onStop()
+    }
+  }
 
   const handleClick = () => {
+    if (isPushToTalk) {
+      if (Date.now() - holdEndRef.current < 400) return
+      if (busy) {
+        onCancel()
+      }
+      return
+    }
+
     if (busy) {
       onCancel()
     } else if (isRecording) {
@@ -106,11 +134,20 @@ export function MicButton({
       <div className="flex items-center gap-4">
         <button
           type="button"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onContextMenu={(e) => e.preventDefault()}
           onClick={handleClick}
           disabled={!connected}
+          style={{
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
           className={`relative inline-flex items-center justify-center w-16 h-16 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed ${
             isRecording
-              ? 'bg-red-500/20 border-2 border-red-500 text-red-400 hover:bg-red-500/30'
+              ? 'bg-red-500/20 border-2 border-red-500 text-red-400 scale-110'
               : busy
                 ? 'bg-orange-500/10 border-2 border-orange-500/40 text-orange-400 hover:bg-orange-500/20 active:scale-95'
                 : isPassiveListening
