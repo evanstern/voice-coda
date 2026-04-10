@@ -95,6 +95,7 @@ export function useAudioSocket(wsUrl: string | null) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const intentionalCloseRef = useRef(false)
   const [connectKey, setConnectKey] = useState(0)
+  const [reconnectCount, setReconnectCount] = useState(0)
   const [micError, setMicError] = useState<string | null>(null)
 
   const [state, setState] = useState<AudioSocketState>({
@@ -540,6 +541,16 @@ export function useAudioSocket(wsUrl: string | null) {
           setState((s) => ({ ...s, phase: 'done' }))
           break
 
+        case 'conversation_updated':
+          log.info('conversation updated after reconnect, refreshing')
+          setReconnectCount((c) => c + 1)
+          break
+
+        case 'processing_pending':
+          log.info('previous processing still in progress')
+          setState((s) => ({ ...s, phase: 'thinking' }))
+          break
+
         case 'command': {
           const label =
             msg.command === 'disregard'
@@ -772,6 +783,7 @@ export function useAudioSocket(wsUrl: string | null) {
 
   return {
     ...state,
+    reconnectCount,
     busy,
     micError,
     startRecording,

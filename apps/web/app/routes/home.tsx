@@ -214,6 +214,11 @@ export default function Home() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectCount intentionally triggers reload after reconnection
   useEffect(() => {
     let cancelled = false
+    const refreshCount = audio.reconnectCount
+
+    if (activeConversationId && refreshCount > 0) {
+      log.info('refreshing conversation after socket update')
+    }
 
     if (activeConversationId && trpc) {
       const loadConversation = async () => {
