@@ -148,6 +148,22 @@ export class OpenCodeProvider implements AIProvider {
     }
   }
 
+  getExternalSessionId(sessionId: string): string | undefined {
+    return this.sessionMap.get(sessionId)
+  }
+
+  setExternalSessionId(sessionId: string, externalId: string): void {
+    this.sessionMap.set(sessionId, externalId)
+    this.sessionLastActive.set(sessionId, Date.now())
+    log.info(
+      {
+        session: sessionId.slice(0, 8),
+        externalSession: externalId.slice(0, 8),
+      },
+      'restored external session mapping',
+    )
+  }
+
   private async getOrCreateSessionId(
     sessionId: string,
     signal?: AbortSignal,

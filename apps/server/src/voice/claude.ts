@@ -35,3 +35,14 @@ export function restoreSession(
 ): void {
   getAIProvider().restoreSession(sessionId, history)
 }
+
+export function getExternalSessionId(sessionId: string): string | undefined {
+  return getAIProvider().getExternalSessionId?.(sessionId)
+}
+
+export function setExternalSessionId(
+  sessionId: string,
+  externalId: string,
+): void {
+  getAIProvider().setExternalSessionId?.(sessionId, externalId)
+}

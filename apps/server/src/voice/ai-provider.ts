@@ -14,6 +14,8 @@ export interface AIProvider {
     sessionId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
   ): void
+  getExternalSessionId?(sessionId: string): string | undefined
+  setExternalSessionId?(sessionId: string, externalId: string): void
 }
 
 export interface ChatParams {
