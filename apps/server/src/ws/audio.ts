@@ -10,10 +10,18 @@ import { logger } from '../logger.js'
 import {
   appendMessage,
   autoTitle,
+  getAISessionId,
   getConversation,
+  updateAISessionId,
 } from '../storage/conversations.js'
 import { getAIProvider } from '../voice/ai-provider.js'
-import { chat, clearSession, restoreSession } from '../voice/claude.js'
+import {
+  chat,
+  clearSession,
+  getExternalSessionId,
+  restoreSession,
+  setExternalSessionId,
+} from '../voice/claude.js'
 import {
   cleanupSession,
   finalizeInteraction,
@@ -133,6 +141,11 @@ export function attachWebSocket(httpServer: Server) {
                   content: m.content,
                 })),
               )
+            }
+
+            const storedAISessionId = await getAISessionId(conversationId)
+            if (storedAISessionId) {
+              setExternalSessionId(sessionId, storedAISessionId)
             }
           }
 
@@ -409,6 +422,11 @@ async function handleControl(
             content: response.text ?? '',
             toolCalls: response.toolCalls,
           })
+
+          const externalId = getExternalSessionId(sessionId)
+          if (externalId) {
+            await updateAISessionId(conversationId, externalId)
+          }
         }
 
         if (signal.aborted) {
