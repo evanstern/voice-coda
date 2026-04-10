@@ -154,6 +154,22 @@ export const wakeDetectionMessage = z.object({
 
 export type WakeDetectionMessage = z.infer<typeof wakeDetectionMessage>
 
+export const conversationUpdatedMessage = z.object({
+  type: z.literal('conversation_updated'),
+  conversationId: z.string(),
+})
+
+export type ConversationUpdatedMessage = z.infer<
+  typeof conversationUpdatedMessage
+>
+
+export const processingPendingMessage = z.object({
+  type: z.literal('processing_pending'),
+  conversationId: z.string(),
+})
+
+export type ProcessingPendingMessage = z.infer<typeof processingPendingMessage>
+
 export const serverWsMessage = z.discriminatedUnion('type', [
   audioAckMessage,
   transcribingMessage,
@@ -167,6 +183,8 @@ export const serverWsMessage = z.discriminatedUnion('type', [
   commandMessage,
   errorMessage,
   wakeDetectionMessage,
+  conversationUpdatedMessage,
+  processingPendingMessage,
 ])
 
 export type ServerWsMessage = z.infer<typeof serverWsMessage>
