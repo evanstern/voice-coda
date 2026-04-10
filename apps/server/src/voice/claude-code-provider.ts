@@ -209,6 +209,15 @@ export class ClaudeCodeProvider implements AIProvider {
     this.sessionMap.delete(sessionId)
   }
 
+  getExternalSessionId(sessionId: string): string | null {
+    return this.sessionMap.get(sessionId) ?? null
+  }
+
+  setExternalSessionId(sessionId: string, externalSessionId: string): void {
+    this.sessionMap.set(sessionId, externalSessionId)
+    this.hasCalledSession.add(externalSessionId)
+  }
+
   restoreSession(
     _sessionId: string,
     _history: Array<{ role: 'user' | 'assistant'; content: string }>,
