@@ -213,6 +213,11 @@ export default function Home() {
   // Load conversation data when activeConversationId changes (URL-driven)
   useEffect(() => {
     let cancelled = false
+    const refreshCount = audio.reconnectCount
+
+    if (activeConversationId && refreshCount > 0) {
+      log.info('refreshing conversation after socket update')
+    }
 
     if (activeConversationId && trpc) {
       const loadConversation = async () => {
@@ -280,7 +285,13 @@ export default function Home() {
     return () => {
       cancelled = true
     }
-  }, [activeConversationId, trpc, navigate, audio.sendConversation])
+  }, [
+    activeConversationId,
+    trpc,
+    navigate,
+    audio.sendConversation,
+    audio.reconnectCount,
+  ])
 
   // Delete conversation
   const deleteConversation = useCallback(
