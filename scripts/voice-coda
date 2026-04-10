@@ -87,8 +87,10 @@ cmd_update() {
 
   log "Pulling latest changes"
   local git=(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "${PROJECT_ROOT}")
-  "${git[@]}" fetch origin main || fail "git fetch failed. Check network and try again."
-  "${git[@]}" reset --hard origin/main || fail "git reset failed. Resolve manually."
+  local branch
+  branch=$("${git[@]}" rev-parse --abbrev-ref HEAD) || fail "Could not determine current branch."
+  "${git[@]}" fetch origin "${branch}" || fail "git fetch failed. Check network and try again."
+  "${git[@]}" reset --hard "origin/${branch}" || fail "git reset failed. Resolve manually."
 
   if [[ -f "${ENV_FILE}" ]]; then
     set -a; source "${ENV_FILE}"; set +a
