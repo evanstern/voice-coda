@@ -142,6 +142,28 @@ export async function updateConversationTitle(
   return true
 }
 
+export async function updateAISessionId(
+  conversationId: string,
+  aiSessionId: string,
+): Promise<boolean> {
+  await ensureDataDir()
+  const entries = await readJsonlLines<ConversationSummary>(INDEX_FILE)
+  const entry = entries.find((candidate) => candidate.id === conversationId)
+  if (!entry) return false
+  entry.aiSessionId = aiSessionId
+  await rewriteIndex(entries)
+  return true
+}
+
+export async function getAISessionId(
+  conversationId: string,
+): Promise<string | null> {
+  await ensureDataDir()
+  const entries = await readJsonlLines<ConversationSummary>(INDEX_FILE)
+  const entry = entries.find((candidate) => candidate.id === conversationId)
+  return entry?.aiSessionId ?? null
+}
+
 export async function autoTitle(
   conversationId: string,
   firstUserMessage: string,
