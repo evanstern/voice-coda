@@ -17,6 +17,7 @@ type ProcessingPhase =
 interface AudioSocketState {
   connected: boolean
   reconnecting: boolean
+  reconnectCount: number
   phase: ProcessingPhase
   chunksReceived: number
   totalBytes: number
@@ -85,6 +86,10 @@ export function useAudioSocket(wsUrl: string | null) {
   const audioFormatRef = useRef('mp3')
   const audioPlaybackRef = useRef<Promise<void> | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const lastConversationRef = useRef<{
+    conversationId: string | null
+    isFirstMessage: boolean
+  } | null>(null)
 
   const reconnectAttemptRef = useRef(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -95,6 +100,7 @@ export function useAudioSocket(wsUrl: string | null) {
   const [state, setState] = useState<AudioSocketState>({
     connected: false,
     reconnecting: false,
+    reconnectCount: 0,
     phase: 'idle',
     chunksReceived: 0,
     totalBytes: 0,
@@ -381,8 +387,25 @@ export function useAudioSocket(wsUrl: string | null) {
 
     ws.onopen = () => {
       log.info('connected to', wsUrl)
+      const wasReconnect = reconnectAttemptRef.current > 0
+      const lastConversation = lastConversationRef.current
       reconnectAttemptRef.current = 0
-      setState((s) => ({ ...s, connected: true, reconnecting: false }))
+      setState((s) => ({
+        ...s,
+        connected: true,
+        reconnecting: false,
+        reconnectCount: wasReconnect ? s.reconnectCount + 1 : s.reconnectCount,
+      }))
+
+      if (wasReconnect && lastConversation?.conversationId) {
+        ws.send(
+          JSON.stringify({
+            type: 'set_conversation',
+            conversationId: lastConversation.conversationId,
+            isFirstMessage: lastConversation.isFirstMessage,
+          }),
+        )
+      }
     }
 
     ws.onmessage = (event) => {
@@ -719,6 +742,7 @@ export function useAudioSocket(wsUrl: string | null) {
 
   const sendConversation = useCallback(
     (conversationId: string | null, isFirstMessage: boolean) => {
+      lastConversationRef.current = { conversationId, isFirstMessage }
       const ws = wsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(
