@@ -135,6 +135,16 @@ export class OpenCodeProvider implements AIProvider {
     this.pendingHistory.delete(sessionId)
   }
 
+  getExternalSessionId(sessionId: string): string | null {
+    return this.sessionMap.get(sessionId) ?? null
+  }
+
+  setExternalSessionId(sessionId: string, externalSessionId: string): void {
+    this.sessionMap.set(sessionId, externalSessionId)
+    this.sessionLastActive.set(sessionId, Date.now())
+    this.pendingHistory.delete(sessionId)
+  }
+
   restoreSession(
     sessionId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,

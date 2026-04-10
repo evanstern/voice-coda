@@ -151,3 +151,30 @@ export async function autoTitle(
     (firstUserMessage.length > 60 ? '\u2026' : '')
   await updateConversationTitle(conversationId, title)
 }
+
+export async function getAISessionId(
+  conversationId: string,
+): Promise<string | null> {
+  await ensureDataDir()
+  const entries = await readJsonlLines<ConversationSummary>(INDEX_FILE)
+  const entry = entries.find(
+    (conversation) => conversation.id === conversationId,
+  )
+  return entry?.aiSessionId ?? null
+}
+
+export async function updateAISessionId(
+  conversationId: string,
+  aiSessionId: string,
+): Promise<boolean> {
+  await ensureDataDir()
+  const entries = await readJsonlLines<ConversationSummary>(INDEX_FILE)
+  const entry = entries.find(
+    (conversation) => conversation.id === conversationId,
+  )
+  if (!entry) return false
+  entry.aiSessionId = aiSessionId
+  entry.updatedAt = new Date().toISOString()
+  await rewriteIndex(entries)
+  return true
+}

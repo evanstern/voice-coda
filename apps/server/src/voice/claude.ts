@@ -29,6 +29,17 @@ export function clearSession(sessionId: string): void {
   getAIProvider().clearSession(sessionId)
 }
 
+export function getExternalSessionId(sessionId: string): string | null {
+  return getAIProvider().getExternalSessionId(sessionId)
+}
+
+export function setExternalSessionId(
+  sessionId: string,
+  externalSessionId: string,
+): void {
+  getAIProvider().setExternalSessionId(sessionId, externalSessionId)
+}
+
 export function restoreSession(
   sessionId: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,

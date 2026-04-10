@@ -456,6 +456,12 @@ export class AnthropicProvider implements AIProvider {
     this.sessionLastActive.delete(sessionId)
   }
 
+  getExternalSessionId(_sessionId: string): string | null {
+    return null
+  }
+
+  setExternalSessionId(_sessionId: string, _externalSessionId: string): void {}
+
   restoreSession(
     sessionId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,

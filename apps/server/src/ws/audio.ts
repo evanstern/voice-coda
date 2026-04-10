@@ -10,10 +10,18 @@ import { logger } from '../logger.js'
 import {
   appendMessage,
   autoTitle,
+  getAISessionId,
   getConversation,
+  updateAISessionId,
 } from '../storage/conversations.js'
 import { getAIProvider } from '../voice/ai-provider.js'
-import { chat, clearSession, restoreSession } from '../voice/claude.js'
+import {
+  chat,
+  clearSession,
+  getExternalSessionId,
+  restoreSession,
+  setExternalSessionId,
+} from '../voice/claude.js'
 import {
   cleanupSession,
   finalizeInteraction,
@@ -42,6 +50,47 @@ function elapsed(startMs: number): string {
 }
 
 const MAX_AUDIO_BUFFER_BYTES = 10 * 1024 * 1024 // 10 MB
+
+const inflightByConversation = new Map<
+  string,
+  { promise: Promise<void>; resolve: () => void; sessionId: string }
+>()
+
+const conversationWatchers = new Map<string, Set<WebSocket>>()
+
+function registerWatcher(conversationId: string, ws: WebSocket) {
+  const watchers =
+    conversationWatchers.get(conversationId) ?? new Set<WebSocket>()
+  watchers.add(ws)
+  conversationWatchers.set(conversationId, watchers)
+}
+
+function unregisterWatcher(conversationId: string | null, ws: WebSocket) {
+  if (!conversationId) {
+    return
+  }
+
+  const watchers = conversationWatchers.get(conversationId)
+  if (!watchers) {
+    return
+  }
+
+  watchers.delete(ws)
+  if (watchers.size === 0) {
+    conversationWatchers.delete(conversationId)
+  }
+}
+
+function notifyConversationUpdated(conversationId: string) {
+  const watchers = conversationWatchers.get(conversationId)
+  if (!watchers) {
+    return
+  }
+
+  for (const watcher of watchers) {
+    send(watcher, { type: 'conversation_updated', conversationId })
+  }
+}
 
 function send(ws: WebSocket, msg: Record<string, unknown>) {
   if (ws.readyState === ws.OPEN) {
@@ -115,6 +164,7 @@ export function attachWebSocket(httpServer: Server) {
 
         // Handle conversation assignment
         if (msg.type === 'set_conversation') {
+          unregisterWatcher(conversationId, ws)
           conversationId = msg.conversationId
           isFirstMessage = msg.isFirstMessage ?? true
           log.info(
@@ -134,6 +184,20 @@ export function attachWebSocket(httpServer: Server) {
                 })),
               )
             }
+
+            const storedAISessionId = await getAISessionId(conversationId)
+            if (storedAISessionId) {
+              setExternalSessionId(sessionId, storedAISessionId)
+            }
+
+            const inflight = inflightByConversation.get(conversationId)
+            if (inflight) {
+              log.info('waiting for in-flight processing to complete')
+              send(ws, { type: 'processing_pending', conversationId })
+              await inflight.promise
+            }
+
+            registerWatcher(conversationId, ws)
           }
 
           send(ws, { type: 'conversation_set', conversationId })
@@ -228,13 +292,25 @@ export function attachWebSocket(httpServer: Server) {
         'connection closed',
       )
 
+      unregisterWatcher(conversationId, ws)
+
       // Clean up server-side state for this session
       audioChunks = []
       chunkCount = 0
       totalBytes = 0
       streamStartedAt = null
       clearSession(sessionId)
-      cleanupSession(sessionId)
+
+      const inflight = conversationId
+        ? inflightByConversation.get(conversationId)
+        : undefined
+      if (inflight?.sessionId === sessionId) {
+        void inflight.promise.then(() => {
+          cleanupSession(sessionId)
+        })
+      } else {
+        cleanupSession(sessionId)
+      }
     })
 
     ws.on('error', (err) => {
@@ -285,200 +361,257 @@ async function handleControl(
       } = getAudioState()
 
       const signal = getAbortSignal()
+      const existingInflight = conversationId
+        ? inflightByConversation.get(conversationId)
+        : undefined
 
-      if (audioChunks.length === 0) {
-        send(ws, {
-          type: 'transcription',
-          text: '',
-          error: 'No audio received',
-        })
-        clearAbort()
-        break
-      }
-
-      let combined: Buffer
-      try {
-        combined = Buffer.concat(audioChunks)
-      } finally {
-        resetAudio()
-      }
-
-      // Phase 1: Transcribe
-      send(ws, { type: 'transcribing', bytes: combined.byteLength })
-
-      let userText: string
-      try {
-        const result = await transcribe(combined)
-        userText = result.text
-        const sttProvider = getSTTProvider()
-        recordSTT(sessionId, result.durationSec, sttProvider.name, 'whisper-1')
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        log.error({ err: message }, 'STT error')
-        send(ws, { type: 'transcription', text: '', error: message })
-        clearAbort()
-        break
-      }
-
-      if (signal.aborted) {
-        log.debug('cancelled after transcription')
-        clearAbort()
-        break
-      }
-
-      // Process voice input through middleware
-      const providerName = getAIProvider().name
-      const voiceInput = await processVoiceInput({
-        rawText: userText,
-        sessionId,
-        provider: providerName,
-      })
-
-      if (voiceInput.command === 'disregard') {
-        log.info('voice command: disregard, dropping message')
-        send(ws, { type: 'transcription', text: userText })
-        send(ws, { type: 'command', command: 'disregard' })
-        clearAbort()
-        break
-      }
-
-      if (voiceInput.command === 'clear') {
+      if (existingInflight) {
         log.info(
-          { session: sessionId.slice(0, 8) },
-          'voice command: clear, resetting session',
+          { conversationId: conversationId?.slice(0, 8) ?? 'none' },
+          'processing already in flight for conversation',
         )
-        clearSession(sessionId)
-        send(ws, { type: 'transcription', text: userText })
-        send(ws, { type: 'command', command: 'clear' })
+        send(ws, { type: 'processing_pending', conversationId })
         clearAbort()
         break
       }
 
-      send(ws, { type: 'transcription', text: voiceInput.displayText })
+      let inflightEntry: {
+        promise: Promise<void>
+        resolve: () => void
+        sessionId: string
+      } | null = null
+      let inflightConversationId: string | null = null
+      let inflightRegistered = false
 
-      if (!voiceInput.displayText) {
-        clearAbort()
-        break
-      }
-
-      // Persist user message (clean text without system decorations)
       if (conversationId) {
-        await appendMessage(conversationId, {
-          role: 'user',
-          content: voiceInput.displayText,
+        inflightConversationId = conversationId
+        let resolveInflight = () => {}
+        const promise = new Promise<void>((resolve) => {
+          resolveInflight = resolve
         })
-        if (isFirstMessage) {
-          await autoTitle(conversationId, voiceInput.displayText)
-          setFirstMessage(false)
+        inflightEntry = {
+          promise,
+          resolve: resolveInflight,
+          sessionId,
         }
-      }
-
-      send(ws, { type: 'thinking' })
-
-      if (voiceInput.operationalIntents.length > 0) {
-        log.debug(
-          { intents: voiceInput.operationalIntents },
-          'detected operational intents',
-        )
+        inflightByConversation.set(conversationId, inflightEntry)
+        inflightRegistered = true
       }
 
       try {
-        const response = await chat(
-          sessionId,
-          voiceInput.chatText,
-          (toolName, toolInput) => {
-            send(ws, { type: 'tool_use', name: toolName, input: toolInput })
-          },
-          signal,
-          voiceInput.voiceContext,
-          voiceInput.routingHint,
-        )
-
-        recordLLM(
-          sessionId,
-          response.usage,
-          response.model,
-          response.providerID ?? providerName,
-          response.reportedCost,
-        )
-
-        // Persist assistant message
-        if (conversationId) {
-          await appendMessage(conversationId, {
-            role: 'assistant',
-            content: response.text ?? '',
-            toolCalls: response.toolCalls,
+        if (audioChunks.length === 0) {
+          send(ws, {
+            type: 'transcription',
+            text: '',
+            error: 'No audio received',
           })
+          clearAbort()
+          break
+        }
+
+        let combined: Buffer
+        try {
+          combined = Buffer.concat(audioChunks)
+        } finally {
+          resetAudio()
+        }
+
+        // Phase 1: Transcribe
+        send(ws, { type: 'transcribing', bytes: combined.byteLength })
+
+        let userText: string
+        try {
+          const result = await transcribe(combined)
+          userText = result.text
+          const sttProvider = getSTTProvider()
+          recordSTT(
+            sessionId,
+            result.durationSec,
+            sttProvider.name,
+            'whisper-1',
+          )
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          log.error({ err: message }, 'STT error')
+          send(ws, { type: 'transcription', text: '', error: message })
+          clearAbort()
+          break
         }
 
         if (signal.aborted) {
-          log.debug('cancelled after ai response')
-          // Still send the response text so it appears in chat, just skip TTS
+          log.debug('cancelled after transcription')
+          clearAbort()
+          break
+        }
+
+        // Process voice input through middleware
+        const providerName = getAIProvider().name
+        const voiceInput = await processVoiceInput({
+          rawText: userText,
+          sessionId,
+          provider: providerName,
+        })
+
+        if (voiceInput.command === 'disregard') {
+          log.info('voice command: disregard, dropping message')
+          send(ws, { type: 'transcription', text: userText })
+          send(ws, { type: 'command', command: 'disregard' })
+          clearAbort()
+          break
+        }
+
+        if (voiceInput.command === 'clear') {
+          log.info(
+            { session: sessionId.slice(0, 8) },
+            'voice command: clear, resetting session',
+          )
+          clearSession(sessionId)
+          send(ws, { type: 'transcription', text: userText })
+          send(ws, { type: 'command', command: 'clear' })
+          clearAbort()
+          break
+        }
+
+        send(ws, { type: 'transcription', text: voiceInput.displayText })
+
+        if (!voiceInput.displayText) {
+          clearAbort()
+          break
+        }
+
+        // Persist user message (clean text without system decorations)
+        if (conversationId) {
+          await appendMessage(conversationId, {
+            role: 'user',
+            content: voiceInput.displayText,
+          })
+          if (isFirstMessage) {
+            await autoTitle(conversationId, voiceInput.displayText)
+            setFirstMessage(false)
+          }
+        }
+
+        send(ws, { type: 'thinking' })
+
+        if (voiceInput.operationalIntents.length > 0) {
+          log.debug(
+            { intents: voiceInput.operationalIntents },
+            'detected operational intents',
+          )
+        }
+
+        try {
+          const response = await chat(
+            sessionId,
+            voiceInput.chatText,
+            (toolName, toolInput) => {
+              send(ws, { type: 'tool_use', name: toolName, input: toolInput })
+            },
+            signal,
+            voiceInput.voiceContext,
+            voiceInput.routingHint,
+          )
+
+          recordLLM(
+            sessionId,
+            response.usage,
+            response.model,
+            response.providerID ?? providerName,
+            response.reportedCost,
+          )
+
+          // Persist assistant message
+          if (conversationId) {
+            await appendMessage(conversationId, {
+              role: 'assistant',
+              content: response.text ?? '',
+              toolCalls: response.toolCalls,
+            })
+
+            const externalId = getExternalSessionId(sessionId)
+            if (externalId) {
+              await updateAISessionId(conversationId, externalId)
+            }
+          }
+
+          if (signal.aborted) {
+            log.debug('cancelled after ai response')
+            // Still send the response text so it appears in chat, just skip TTS
+            send(ws, {
+              type: 'ai_response',
+              text: response.text,
+              toolCalls: response.toolCalls,
+            })
+            finalizeInteraction(sessionId)
+            clearAbort()
+            break
+          }
+
           send(ws, {
             type: 'ai_response',
             text: response.text,
             toolCalls: response.toolCalls,
           })
+
+          //   Filter out code blocks, inline code, and raw paths first so
+          //   we only pay for (and hear) the conversational content.
+          const spokenText = response.text ? filterForTTS(response.text) : ''
+          if (spokenText && !signal.aborted) {
+            send(ws, { type: 'synthesizing' })
+
+            try {
+              const ttsProvider = await getTTSProvider()
+              recordTTS(sessionId, spokenText.length, ttsProvider.name, 'tts-1')
+              const audioBuffer = await ttsProvider.synthesize(spokenText)
+
+              if (signal.aborted) {
+                log.debug('cancelled after TTS synthesis')
+                finalizeInteraction(sessionId)
+                clearAbort()
+                break
+              }
+
+              send(ws, {
+                type: 'tts_audio',
+                format: ttsProvider.defaultFormat,
+                bytes: audioBuffer.byteLength,
+              })
+              // Send the raw audio as binary
+              if (ws.readyState === ws.OPEN) {
+                ws.send(audioBuffer)
+              }
+            } catch (ttsErr) {
+              const ttsMsg =
+                ttsErr instanceof Error ? ttsErr.message : 'Unknown error'
+              log.error({ err: ttsMsg }, 'TTS error')
+              send(ws, { type: 'tts_error', error: ttsMsg })
+            }
+          }
+
           finalizeInteraction(sessionId)
-          clearAbort()
-          break
+        } catch (err) {
+          if (signal.aborted) {
+            log.debug('cancelled during ai call')
+            finalizeInteraction(sessionId)
+            clearAbort()
+            break
+          }
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          log.error({ err: message }, 'AI error')
+          send(ws, { type: 'ai_response', text: '', error: message })
+          finalizeInteraction(sessionId)
         }
+        clearAbort()
+      } finally {
+        if (inflightRegistered && inflightConversationId) {
+          inflightByConversation.delete(inflightConversationId)
+          inflightEntry?.resolve()
 
-        send(ws, {
-          type: 'ai_response',
-          text: response.text,
-          toolCalls: response.toolCalls,
-        })
-
-        //   Filter out code blocks, inline code, and raw paths first so
-        //   we only pay for (and hear) the conversational content.
-        const spokenText = response.text ? filterForTTS(response.text) : ''
-        if (spokenText && !signal.aborted) {
-          send(ws, { type: 'synthesizing' })
-
-          try {
-            const ttsProvider = await getTTSProvider()
-            recordTTS(sessionId, spokenText.length, ttsProvider.name, 'tts-1')
-            const audioBuffer = await ttsProvider.synthesize(spokenText)
-
-            if (signal.aborted) {
-              log.debug('cancelled after TTS synthesis')
-              finalizeInteraction(sessionId)
-              clearAbort()
-              break
-            }
-
-            send(ws, {
-              type: 'tts_audio',
-              format: ttsProvider.defaultFormat,
-              bytes: audioBuffer.byteLength,
-            })
-            // Send the raw audio as binary
-            if (ws.readyState === ws.OPEN) {
-              ws.send(audioBuffer)
-            }
-          } catch (ttsErr) {
-            const ttsMsg =
-              ttsErr instanceof Error ? ttsErr.message : 'Unknown error'
-            log.error({ err: ttsMsg }, 'TTS error')
-            send(ws, { type: 'tts_error', error: ttsMsg })
+          if (ws.readyState !== ws.OPEN) {
+            notifyConversationUpdated(inflightConversationId)
           }
         }
-
-        finalizeInteraction(sessionId)
-      } catch (err) {
-        if (signal.aborted) {
-          log.debug('cancelled during ai call')
-          finalizeInteraction(sessionId)
-          clearAbort()
-          break
-        }
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        log.error({ err: message }, 'AI error')
-        send(ws, { type: 'ai_response', text: '', error: message })
-        finalizeInteraction(sessionId)
       }
-      clearAbort()
       break
     }
 

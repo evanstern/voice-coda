@@ -211,8 +211,14 @@ export default function Home() {
   }, [trpc, refreshConversations, navigate])
 
   // Load conversation data when activeConversationId changes (URL-driven)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectCount intentionally triggers reload after reconnection
   useEffect(() => {
     let cancelled = false
+    const refreshCount = audio.reconnectCount
+
+    if (activeConversationId && refreshCount > 0) {
+      log.info('refreshing conversation after socket update')
+    }
 
     if (activeConversationId && trpc) {
       const loadConversation = async () => {
@@ -290,6 +296,7 @@ export default function Home() {
     navigate,
     audio.connected,
     audio.sendConversation,
+    audio.reconnectCount,
   ])
 
   // Delete conversation

@@ -17,6 +17,7 @@ type ProcessingPhase =
 interface AudioSocketState {
   connected: boolean
   reconnecting: boolean
+  reconnectCount: number
   phase: ProcessingPhase
   chunksReceived: number
   totalBytes: number
@@ -85,16 +86,22 @@ export function useAudioSocket(wsUrl: string | null) {
   const audioFormatRef = useRef('mp3')
   const audioPlaybackRef = useRef<Promise<void> | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const lastConversationRef = useRef<{
+    conversationId: string | null
+    isFirstMessage: boolean
+  } | null>(null)
 
   const reconnectAttemptRef = useRef(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const intentionalCloseRef = useRef(false)
   const [connectKey, setConnectKey] = useState(0)
+  const [reconnectCount, setReconnectCount] = useState(0)
   const [micError, setMicError] = useState<string | null>(null)
 
   const [state, setState] = useState<AudioSocketState>({
     connected: false,
     reconnecting: false,
+    reconnectCount: 0,
     phase: 'idle',
     chunksReceived: 0,
     totalBytes: 0,
@@ -381,8 +388,25 @@ export function useAudioSocket(wsUrl: string | null) {
 
     ws.onopen = () => {
       log.info('connected to', wsUrl)
+      const wasReconnect = reconnectAttemptRef.current > 0
+      const lastConversation = lastConversationRef.current
       reconnectAttemptRef.current = 0
-      setState((s) => ({ ...s, connected: true, reconnecting: false }))
+      setState((s) => ({
+        ...s,
+        connected: true,
+        reconnecting: false,
+        reconnectCount: wasReconnect ? s.reconnectCount + 1 : s.reconnectCount,
+      }))
+
+      if (wasReconnect && lastConversation?.conversationId) {
+        ws.send(
+          JSON.stringify({
+            type: 'set_conversation',
+            conversationId: lastConversation.conversationId,
+            isFirstMessage: lastConversation.isFirstMessage,
+          }),
+        )
+      }
     }
 
     ws.onmessage = (event) => {
@@ -515,6 +539,16 @@ export function useAudioSocket(wsUrl: string | null) {
         case 'tts_error':
           log.error(`TTS error: ${msg.error}`)
           setState((s) => ({ ...s, phase: 'done' }))
+          break
+
+        case 'conversation_updated':
+          log.info('conversation updated after reconnect, refreshing')
+          setReconnectCount((c) => c + 1)
+          break
+
+        case 'processing_pending':
+          log.info('previous processing still in progress')
+          setState((s) => ({ ...s, phase: 'thinking' }))
           break
 
         case 'command': {
@@ -719,6 +753,7 @@ export function useAudioSocket(wsUrl: string | null) {
 
   const sendConversation = useCallback(
     (conversationId: string | null, isFirstMessage: boolean) => {
+      lastConversationRef.current = { conversationId, isFirstMessage }
       const ws = wsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(
@@ -748,6 +783,7 @@ export function useAudioSocket(wsUrl: string | null) {
 
   return {
     ...state,
+    reconnectCount,
     busy,
     micError,
     startRecording,
