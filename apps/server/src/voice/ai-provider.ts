@@ -10,6 +10,8 @@ export interface AIProvider {
   readonly name: string
   chat(params: ChatParams): Promise<ChatResponse>
   clearSession(sessionId: string): void
+  getExternalSessionId(sessionId: string): string | null
+  setExternalSessionId(sessionId: string, externalSessionId: string): void
   restoreSession(
     sessionId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }>,
